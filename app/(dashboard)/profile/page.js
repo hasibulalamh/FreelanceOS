@@ -1,4 +1,4 @@
-import { Puzzle, Briefcase, GraduationCap, FolderKanban, Quote, UserRound, Sparkles } from "lucide-react";
+import { Briefcase, GraduationCap, FolderKanban, Quote, UserRound } from "lucide-react";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -6,6 +6,9 @@ import { serverConfig } from "@/lib/config";
 import { Card, CardHeader, Badge, EmptyState } from "@/components/ui";
 import { PortfolioSyncButton } from "@/components/portfolio-sync-button";
 import { IdentityEditor } from "@/components/profile/identity-editor";
+import { SkillsManager } from "@/components/profile/skills-manager";
+import { ServicesManager } from "@/components/profile/services-manager";
+import { CertificationsManager } from "@/components/profile/certifications-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -17,23 +20,20 @@ const SYNC_TONES = {
   NEVER_SYNCED: "neutral",
 };
 
-
-
 export default async function ProfilePage() {
   const session = await auth();
   const profile = await prisma.profile.findUnique({
     where: { userId: session.user.id },
     include: {
       skills: { orderBy: { name: "asc" } },
-      services: true,
+      services: { orderBy: { title: "asc" } },
       experiences: true,
       education: true,
+      certifications: { orderBy: { name: "asc" } },
       projects: { orderBy: { featured: "desc" } },
       testimonials: true,
     },
   });
-
-  const skillCategories = groupSkillsByCategory(profile?.skills ?? []);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -100,60 +100,26 @@ export default async function ProfilePage() {
       </Card>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Skills */}
+        {/* Skills — synced rows are read-only; manual rows are editable */}
         <Card>
-          <CardHeader title="Skills" subtitle={`${profile?.skills.length ?? 0} synchronized`} />
-          {skillCategories.length === 0 ? (
-            <EmptyState
-              icon={Puzzle}
-              title="No skills yet"
-              description="Skills appear here after the first portfolio sync."
-            />
-          ) : (
-            <div className="space-y-4 px-5 py-4">
-              {skillCategories.map((group) => (
-                <div key={group.category}>
-                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {group.category ?? "Other"}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {group.skills.map((skill) => (
-                      <span
-                        key={skill.id}
-                        className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-700"
-                      >
-                        {skill.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <CardHeader
+            title="Skills"
+            subtitle={`${profile?.skills.length ?? 0} total · manual entries survive sync`}
+          />
+          <SkillsManager skills={profile?.skills ?? []} />
         </Card>
 
         {/* Services — the portfolio API has no services endpoint, so this
             stays manual by design. */}
         <Card>
           <CardHeader title="Services" subtitle="Manual entries — not part of the portfolio API" />
-          {(profile?.services.length ?? 0) === 0 ? (
-            <EmptyState
-              icon={Sparkles}
-              title="No services defined"
-              description="Services will be manageable manually in the profile editing phase; AI gig generation will build on them."
-            />
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {profile.services.map((service) => (
-                <li key={service.id} className="px-5 py-3">
-                  <p className="text-sm font-medium text-slate-900">{service.title}</p>
-                  {service.description ? (
-                    <p className="mt-0.5 text-xs text-slate-600">{service.description}</p>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
+          <ServicesManager services={profile?.services ?? []} />
+        </Card>
+
+        {/* Certifications — also manual-only by design. */}
+        <Card>
+          <CardHeader title="Certifications" subtitle="Manual entries — not part of the portfolio API" />
+          <CertificationsManager certifications={profile?.certifications ?? []} />
         </Card>
 
         {/* Experience */}
@@ -278,17 +244,4 @@ function Meta({ label, value, link = false }) {
       </dd>
     </div>
   );
-}
-
-function groupSkillsByCategory(skills) {
-  const groups = new Map();
-  for (const skill of skills) {
-    const key = skill.category ?? "Other";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(skill);
-  }
-  return Array.from(groups, ([category, groupSkills]) => ({
-    category: category === "Other" ? null : category,
-    skills: groupSkills,
-  }));
 }
