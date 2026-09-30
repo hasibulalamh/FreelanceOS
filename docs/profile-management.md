@@ -7,7 +7,7 @@ with explicit ownership rules so the two never fight.
 
 | Data | Source | Editable here? | Survives sync? |
 | ---- | ------ | -------------- | -------------- |
-| Identity (name, title, summary, bio, location, URLs, rate, languages) | Portfolio (hero/about/contact) | Yes — but a portfolio sync **overwrites** | ✗ (portfolio wins) |
+| Identity (name, title, summary, bio, location, URLs, rate, languages) | Portfolio (hero/about/contact) | Yes — edited fields become **manual overrides** (see below) | Overridden fields: ✓ until released |
 | Skills | Portfolio + manual | Synced rows: read-only. Manual rows: full CRUD | Manual: ✓ / Synced: replaced |
 | Services | Manual only (no portfolio endpoint) | Full CRUD | ✓ |
 | Certifications | Manual only (no portfolio endpoint) | Full CRUD | ✓ |
@@ -15,6 +15,28 @@ with explicit ownership rules so the two never fight.
 
 The UI marks synced skill rows with a `synced` badge and "via sync" hint;
 mutating them through the API returns `403` with an explanation.
+
+## Manual overrides on identity fields
+
+Identity fields that portfolio sync writes (`fullName`, `professionalTitle`,
+`bio`, `summary`, `location`, `portfolioUrl`, `avatarUrl`) support per-field
+manual overrides:
+
+- **Edit** — saving a field through `PATCH /api/profile` records it in
+  `Profile.manualOverrides`. Portfolio sync then **skips** that field
+  (implemented in `identityFieldsForSync`), so e.g. a repositioned
+  professional title survives syncs, while the other fields keep updating.
+- **Release** — `DELETE /api/profile/overrides/[field]` removes the override
+  and immediately runs a **forced sync** (`forceWrite` bypasses the
+  unchanged-payload hash short-circuit) so the portfolio value is restored
+  right away. The profile page shows overridden fields as chips with a
+  release button.
+- Releasing with `PORTFOLIO_API_URL` unset still releases the override; the
+  value just stays as-is until the next successful sync.
+
+Unit-tested (`identityFieldsForSync`) and verified end-to-end: override →
+genuinely-changed portfolio payload → `SYNCED` with the override intact →
+release restores the new portfolio value.
 
 ## Update semantics (PATCH endpoints)
 
@@ -59,8 +81,6 @@ collection.
 
 ## Known limitation (documented trade-off)
 
-Identity edits are overwritten by the next portfolio sync **that has changes**.
-If you reposition your title independently of the portfolio, that override is
-lost. Per-field manual-override tracking (`manuallyEditedFields` on Profile +
-sync skip logic) is a planned enhancement — deliberately deferred to keep the
-sync service simple until the need is proven.
+Only the identity fields listed above can be overridden. Experience,
+education, projects and testimonials are still fully portfolio-managed;
+per-row overrides there are a planned enhancement.

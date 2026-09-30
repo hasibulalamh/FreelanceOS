@@ -96,7 +96,9 @@ a SHA-256 payload hash, and replaces `PORTFOLIO`-sourced rows while preserving
 ### Manual editing semantics
 `PATCH` endpoints distinguish "untouched" (absent key) from "cleared"
 (empty string → `null` on nullable columns), reject unknown keys, and
-preserve `MANUAL` rows across portfolio syncs. See `docs/profile-management.md`.
+preserve `MANUAL` rows across portfolio syncs. Identity fields edited
+manually become **overrides** — portfolio sync skips them until released.
+See `docs/profile-management.md`.
 
 ### Platform capabilities
 `services/platforms/catalog.js` is the single source of truth for what each
