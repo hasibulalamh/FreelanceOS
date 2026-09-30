@@ -40,6 +40,8 @@ docker run -d --name freelanceos-pg \
   -e POSTGRES_DB=freelanceos -p 5433:5432 postgres:16-alpine
 
 cp .env.example .env          # then fill DATABASE_URL + AUTH_SECRET
+# optional but recommended: CREDENTIAL_ENCRYPTION_KEY (openssl rand -hex 32)
+# to encrypt marketplace OAuth tokens at rest
 pnpm exec prisma migrate dev  # apply schema
 pnpm exec prisma db seed      # platform capability catalog
 pnpm dev                      # http://localhost:3000
@@ -105,6 +107,17 @@ See `docs/profile-management.md`.
 marketplace supports. `AUTOMATIC_SUBMISSION` is `NOT_SUPPORTED` on **every**
 platform by policy. Tests guard the catalog against silent drift.
 
+### Platform adapters
+`services/platforms/registry.js` maps platform slugs to adapters and gates
+every platform operation through the DB-seeded capability statuses — a
+capability marked `MANUAL_ONLY` returns HTTP 403 no matter what asks for it.
+Freelancer.com is the first adapter: official OAuth 2 (authorization code)
+against `accounts.freelancer.com`, the `users/0.1/self` profile endpoint and
+the `projects/0.1/projects` search endpoint, with tokens **encrypted at rest**
+(AES-256-GCM via `CREDENTIAL_ENCRYPTION_KEY`). Connect/disconnect, profile
+fetch and job search are live under `/api/platforms/freelancer/*`; job results
+are returned, not yet persisted. See `docs/platforms.md`.
+
 ### Honest data rule
 The dashboard, analytics and profile pages only render numbers that exist in
 the database. Empty states carry CTAs; missing features are labeled with the
@@ -118,7 +131,7 @@ phase that delivers them.
 - [x] Phase 4 — Dashboard shell
 - [x] Phase 5 — Portfolio sync
 - [x] Phase 6 — Profile management (identity editing, manual skills/services/certifications)
-- [ ] Phase 7 — Platform adapters (official APIs where they exist)
+- [x] Phase 7 — Platform adapters (Freelancer.com official API + OAuth, encrypted tokens)
 - [ ] Phase 8+ — Gemini AI engine, keyword research, profile optimizer,
       job analyzer, portfolio matcher, proposals, gig builder
 - [ ] Phase 17+ — Client CRM, analytics, Redis/BullMQ, R2, extension
@@ -128,6 +141,8 @@ See `docs/` for module-level documentation.
 ## Security notes
 
 - Marketplace passwords/cookies are **never** stored; no credential fields exist.
+- Third-party OAuth tokens are stored **encrypted at rest** (AES-256-GCM) or
+  not at all.
 - No scraping, CAPTCHA/anti-bot bypass, or mass actions — by design and by test.
 - Secrets live only in env vars; `.env*` is gitignored; API routes authorize
   via session and rate-limit sensitive endpoints.

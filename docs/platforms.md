@@ -41,10 +41,77 @@ if someone edits the catalog without evidence.
 | -------- | ------------ | ----- | ---------- | --------------- |
 | Fiverr | ✗ none | ✗ | manual | manual only |
 | Upwork | approval required | approval required | user OAuth | manual |
-| Freelancer | ✓ public API | ✓ | API | manual |
+| Freelancer | ✓ public API | ✓ | user OAuth | manual |
 | PeoplePerHour | ✗ none | ✗ | manual | manual only |
 | Guru | ✗ none | ✗ | manual | manual only |
 | Contra | ✗ none | ✗ | manual | manual only |
+
+## Freelancer adapter (Phase 7)
+
+Freelancer.com is the only marketplace in the catalog with a self-service
+official API + OAuth flow, so it is the first (and currently only) registered
+adapter. Everything below talks to **official endpoints only** — no scraping.
+
+### Configuration
+
+Set `FREELANCER_CLIENT_ID` / `FREELANCER_CLIENT_SECRET` from an application
+created at developers.freelancer.com. Register this redirect URI there:
+
+```
+{NEXTAUTH_URL}/api/platforms/freelancer/callback
+```
+
+`FREELANCER_ACCOUNTS_BASE_URL` / `FREELANCER_API_BASE_URL` override the
+production endpoints for the sandbox or the test mock. When the client
+credentials are unset the adapter reports "not configured" (HTTP 503) instead
+of pretending to work.
+
+### What is implemented
+
+- **Connect** — `GET /api/platforms/freelancer/connect` starts the OAuth 2
+  authorization-code flow (`response_type=code`, `scope=basic`,
+  `prompt=select_account consent`) with a CSRF `state` stored in a 10-minute
+  httpOnly cookie. The callback validates `state`, exchanges the code at
+  `accounts.freelancer.com/oauth/token`, fetches `users/0.1/self`, and stores
+  the connection.
+- **Encrypted tokens at rest** — access/refresh tokens are AES-256-GCM
+  encrypted (`lib/crypto.js`, `v1:<iv>:<tag>:<data>` format, key derived from
+  `CREDENTIAL_ENCRYPTION_KEY` via scrypt) before they ever touch the database.
+  Plaintext tokens never appear in logs, API responses, or the DB.
+- **Token lifecycle** — `getValidAccessToken` proactively refreshes 60 seconds
+  before expiry; a failed refresh marks the account disconnected rather than
+  retrying with a dead token.
+- **Disconnect** — `DELETE /api/platforms/freelancer/connection` destroys all
+  stored tokens (NULLs them) and logs the activity.
+- **Profile fetch** — `GET /api/platforms/freelancer/profile` reads the
+  connected freelancer's identity via `users/0.1/self` (projection only).
+- **Job search** — `GET /api/platforms/freelancer/jobs?query=…` searches
+  `projects/0.1/projects` with the user's token. Results are returned,
+  **not persisted** — job import/persistence is a later phase.
+
+### Capability enforcement (the registry)
+
+`services/platforms/registry.js` is the single gate for every platform
+operation: `authorizePlatformOperation(slug, capability, userId)` reads the
+**DB-seeded capability status** and enforces it —
+
+- `SUPPORTED` → allowed.
+- `USER_AUTH_REQUIRED` / `PLATFORM_APPROVAL_REQUIRED` → allowed only with a
+  registered adapter **and** a CONNECTED account for that user.
+- `MANUAL_ONLY` / `NOT_SUPPORTED` → HTTP 403 with the catalog's honest
+  explanation, no matter what code asks for it.
+
+Unknown platform slugs 404. This is what makes the capability table above
+*enforced policy* instead of documentation.
+
+### Testing
+
+`tests/mock/freelancer-api.mjs` stands in for both `accounts.freelancer.com`
+and the REST API (ports 4402); `tests/unit/freelancer-oauth.test.js` covers
+authorize-URL construction, code exchange, refresh, envelope parsing, and
+error shapes. Real-marketplace E2E requires real developer credentials, which
+can only be created by the account owner — by design, no fake credentials
+exist in the repo.
 
 ## How the UI uses it
 
