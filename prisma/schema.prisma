@@ -41,21 +41,23 @@ model User {
   activityLogs     ActivityLog[]
 
   @@map("users")
-}
-
-// OAuth provider links (Google, GitHub). Shape is Auth.js-compatible so the
-// adapter can be swapped without a data migration.
+}// OAuth provider links (Google, GitHub). Field names intentionally match
+// what next-auth v4's built-in PrismaAdapter writes (type, refresh_token,
+// access_token, expires_at as Int), so the adapter works with zero custom
+// mapping code.
 model Account {
-  id                   String    @id @default(cuid())
-  userId               String
-  provider             String
-  providerAccountId    String
-  providerRefreshToken String?
-  providerAccessToken  String?
-  expiresAt            DateTime?
-  tokenType            String?
-  scope                String?
-  idToken              String?
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
