@@ -333,17 +333,26 @@ enum PlatformCapabilityStatus {
   MANUAL_ONLY
 }
 
-// A user's account on a marketplace. Credentials are intentionally absent:
-// FreelanceOS never stores marketplace passwords or browser cookies. When an
-// official OAuth integration is added (later phase), encrypted token columns
-// will be introduced by migration.
+// A user's account on a marketplace.
+//
+// Credentials policy: marketplace passwords and browser cookies are never
+// stored, full stop. For platforms with an OFFICIAL OAuth flow (currently
+// Freelancer.com), the OAuth access/refresh tokens ARE stored — encrypted at
+// rest with AES-256-GCM (lib/crypto.js) and never returned by any API route.
+// Tokens are only used server-side against the platform's official API.
 model PlatformAccount {
-  id               String                @id @default(cuid())
-  userId           String
-  platformId       String
-  status           PlatformAccountStatus @default(NOT_CONNECTED)
-  externalUsername String?
-  lastSyncedAt     DateTime?
+  id                String                @id @default(cuid())
+  userId            String
+  platformId        String
+  status            PlatformAccountStatus @default(NOT_CONNECTED)
+  externalUsername  String?
+  lastSyncedAt      DateTime?
+
+  // Official-OAuth credentials (encrypted at rest; see lib/crypto.js).
+  oauthAccessToken  String?
+  oauthRefreshToken String?
+  oauthExpiresAt    DateTime?
+  oauthScope        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
