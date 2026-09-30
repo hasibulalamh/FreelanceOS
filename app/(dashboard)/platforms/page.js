@@ -4,6 +4,8 @@ import { ExternalLink, ShieldCheck, ShieldAlert } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardHeader, Badge, EmptyState } from "@/components/ui";
+import { FreelancerCardActions } from "@/components/platforms/freelancer-card-actions";
+import { isConfigured as freelancerConfigured } from "@/services/platforms/freelancer/config";
 
 export const dynamic = "force-dynamic";
 
@@ -34,8 +36,18 @@ const ACCOUNT_TONES = {
   ERROR: "red",
 };
 
-export default async function PlatformsPage() {
+const CONNECT_ERRORS = {
+  "consent-declined": "Freelancer authorization was declined — nothing was connected.",
+  "state-mismatch": "The connection could not be verified (security check). Please try again.",
+  "exchange-failed": "Freelancer did not accept the authorization. Please try again.",
+  "missing-parameters": "The callback was missing required parameters.",
+  "not-signed-in": "Your session expired — sign in and connect again.",
+  "not-permitted": "This connection is not permitted by the platform capability model.",
+};
+
+export default async function PlatformsPage({ searchParams }) {
   const session = await auth();
+  const params = await searchParams;
 
   const platforms = await prisma.platform.findMany({
     where: { isActive: true },
@@ -56,6 +68,17 @@ export default async function PlatformsPage() {
           publish action always stays with you.
         </p>
       </header>
+
+      {params?.connected === "freelancer" ? (
+        <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800">
+          Freelancer account connected via the official API.
+        </div>
+      ) : null}
+      {params?.connect_error && CONNECT_ERRORS[params.connect_error] ? (
+        <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+          {CONNECT_ERRORS[params.connect_error]}
+        </div>
+      ) : null}
 
       {platforms.length === 0 ? (
         <Card>
@@ -117,6 +140,14 @@ export default async function PlatformsPage() {
                     </li>
                   ))}
                 </ul>
+
+                {platform.slug === "freelancer" ? (
+                  <FreelancerCardActions
+                    connected={account?.status === "CONNECTED"}
+                    configured={freelancerConfigured()}
+                    username={account?.externalUsername}
+                  />
+                ) : null}
               </Card>
             );
           })}

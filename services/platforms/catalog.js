@@ -139,8 +139,8 @@ export const PLATFORMS = [
         notes: "Public API exposes profile endpoints after user authorization.",
       },
       JOB_IMPORT: {
-        status: "SUPPORTED",
-        notes: "Official projects/list API is public and documented.",
+        status: "USER_AUTH_REQUIRED",
+        notes: "Official projects/search API works with the user's OAuth token.",
       },
       GIG_MANAGEMENT: {
         status: "MANUAL_ONLY",

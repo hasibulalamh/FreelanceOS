@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { Construction, ArrowLeft } from "lucide-react";
 
 import { Card, Badge } from "@/components/ui";
@@ -24,13 +25,18 @@ const MODULE_PHASES = {
   settings: { phase: "Ongoing", title: "Settings", note: "Account and application settings." },
 };
 
-export function generateStaticParams() {
-  return Object.keys(MODULE_PHASES).map((slug) => ({ slug: [slug] }));
-}
+
 
 export default async function ModulePlaceholderPage({ params }) {
   const { slug } = await params;
   const key = slug?.[0];
+
+  // Only known planned modules render here. Anything else — including
+  // unmatched /api/* paths, which must never return a page shell — is a 404.
+  if (!key || key === "api" || !MODULE_PHASES[key]) {
+    notFound();
+  }
+
   const meta = MODULE_PHASES[key];
 
   return (

@@ -11,6 +11,9 @@ const eslintConfig = defineConfig([
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
+      // Plain JavaScript project: catch references to names that were never
+      // imported (the TypeScript checker does this for TS projects).
+      "no-undef": "error",
       // Strict equality keeps database comparisons (null vs undefined,
       // 0 vs "") predictable. == with null is still allowed via options below.
       eqeqeq: ["error", "smart"],
