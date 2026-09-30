@@ -65,7 +65,7 @@ created becomes the platform OWNER; further registrations are rejected.
 app/
   (dashboard)/          protected app (sidebar shell, session-gated)
     dashboard/          DB-backed overview (no fabricated metrics)
-    profile/            portfolio-synced master profile
+    profile/            portfolio-synced master profile + manual editing
     platforms/          capability-honest platform cards
     [...slug]/          honest "planned module" placeholders
   api/
@@ -93,6 +93,11 @@ a SHA-256 payload hash, and replaces `PORTFOLIO`-sourced rows while preserving
 `MANUAL` additions. Unset `PORTFOLIO_API_URL` yields a graceful
 "not configured" state — the app never fakes data.
 
+### Manual editing semantics
+`PATCH` endpoints distinguish "untouched" (absent key) from "cleared"
+(empty string → `null` on nullable columns), reject unknown keys, and
+preserve `MANUAL` rows across portfolio syncs. See `docs/profile-management.md`.
+
 ### Platform capabilities
 `services/platforms/catalog.js` is the single source of truth for what each
 marketplace supports. `AUTOMATIC_SUBMISSION` is `NOT_SUPPORTED` on **every**
@@ -110,7 +115,7 @@ phase that delivers them.
 - [x] Phase 3 — Authentication
 - [x] Phase 4 — Dashboard shell
 - [x] Phase 5 — Portfolio sync
-- [ ] Phase 6 — Profile management (manual editing)
+- [x] Phase 6 — Profile management (identity editing, manual skills/services/certifications)
 - [ ] Phase 7 — Platform adapters (official APIs where they exist)
 - [ ] Phase 8+ — Gemini AI engine, keyword research, profile optimizer,
       job analyzer, portfolio matcher, proposals, gig builder
