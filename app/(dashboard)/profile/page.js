@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { serverConfig } from "@/lib/config";
 import { Card, CardHeader, Badge, EmptyState } from "@/components/ui";
 import { PortfolioSyncButton } from "@/components/portfolio-sync-button";
+import { IdentityEditor } from "@/components/profile/identity-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,7 @@ export default async function ProfilePage() {
         <CardHeader
           title="Personal information"
           subtitle="Sourced from the portfolio hero, about and contact sections"
+          action={<IdentityEditor profile={profile ?? {}} />}
         />
         {profile?.fullName || profile?.professionalTitle ? (
           <div className="grid grid-cols-1 gap-6 px-5 py-4 md:grid-cols-3">
