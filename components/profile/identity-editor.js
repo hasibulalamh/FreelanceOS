@@ -77,7 +77,8 @@ export function IdentityEditor({ profile }) {
 
       <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-800">
         <Info className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
-        Portfolio sync overwrites these fields from hasibulalam.com.
+        Fields you save here are marked as manual — portfolio sync skips them
+        until you release them (see the manual-fields list on the profile).
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

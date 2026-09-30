@@ -118,6 +118,11 @@ model Profile {
   // Content hash of the last portfolio payload, used to detect changes
   // without re-running the whole normalization pipeline.
   lastSyncHash String?
+  // Identity field names (camelCase DB column names) the user has manually
+  // edited. Portfolio sync skips these fields until released, so e.g. a
+  // repositioned professional title survives syncs. See docs/profile-
+  // management.md.
+  manualOverrides String[] @default([])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

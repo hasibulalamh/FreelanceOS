@@ -9,6 +9,7 @@ import {
   normalizeTimeline,
   normalizeTestimonials,
   normalizeIdentity,
+  identityFieldsForSync,
   hashPayload,
   TIMELINE_TYPE,
 } from "@/services/portfolio/normalize";
@@ -25,7 +26,14 @@ import {
  *  - MANUAL rows (added by the user inside FreelanceOS) are preserved —
  *  new rows are always created with source MANUAL by the profile UI.
  */
-export async function syncPortfolio(userId) {
+/**
+ * @param {string} userId
+ * @param {object} [options]
+ * @param {boolean} [options.forceWrite] run the write phase even when the
+ *   payload hash is unchanged. Used after releasing a manual override so the
+ *   released field is restored from the portfolio immediately.
+ */
+export async function syncPortfolio(userId, { forceWrite = false } = {}) {
   const baseUrl = serverConfig.portfolioApiUrl;
   if (!baseUrl) {
     return {
@@ -67,8 +75,9 @@ export async function syncPortfolio(userId) {
       });
 
       // Skip the write phase entirely when the portfolio payload is
-      // byte-identical to the last sync (cheap change detection).
-      if (profile.lastSyncHash === syncHash) {
+      // byte-identical to the last sync (cheap change detection) — unless a
+      // caller forces a write (override release restores fields immediately).
+      if (profile.lastSyncHash === syncHash && !forceWrite) {
         return { status: "UNCHANGED", changed: false };
       }
 
@@ -77,7 +86,8 @@ export async function syncPortfolio(userId) {
       await tx.profile.update({
         where: { id: profile.id },
         data: {
-          ...identityFields(normalized.identity),
+          // Manual overrides win: overridden fields are left untouched.
+          ...identityFieldsForSync(normalized.identity, profile.manualOverrides),
           syncStatus: "SYNCED",
           lastSyncedAt: new Date(),
           lastSyncHash: syncHash,
@@ -118,24 +128,6 @@ export async function syncPortfolio(userId) {
   }
 }
 
-/** Updates only the columns the identity mapping produces. */
-function identityFields(identity) {
-  const fields = {};
-  for (const key of [
-    "fullName",
-    "professionalTitle",
-    "bio",
-    "summary",
-    "location",
-    "portfolioUrl",
-    "avatarUrl",
-  ]) {
-    // undefined means "leave untouched"; null is a legitimate new value when
-    // the portfolio removed a field.
-    if (identity[key] !== undefined) fields[key] = identity[key];
-  }
-  return fields;
-}
 
 /**
  * Replace PORTFOLIO-sourced rows, preserve MANUAL rows.

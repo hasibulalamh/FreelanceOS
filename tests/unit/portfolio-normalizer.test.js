@@ -6,9 +6,48 @@ import {
   normalizeTimeline,
   normalizeTestimonials,
   normalizeIdentity,
+  identityFieldsForSync,
+  SYNC_MANAGED_IDENTITY_FIELDS,
   hashPayload,
   TIMELINE_TYPE,
 } from "@/services/portfolio/normalize";
+
+describe("identityFieldsForSync", () => {
+  const identity = {
+    fullName: "Portfolio Name",
+    professionalTitle: "Portfolio Title",
+    bio: "Portfolio bio",
+    summary: null,
+    location: "Dhaka",
+    portfolioUrl: "https://hasibulalam.com",
+    avatarUrl: null,
+  };
+
+  it("writes all sync-managed fields when nothing is overridden", () => {
+    const fields = identityFieldsForSync(identity, []);
+    expect(Object.keys(fields).sort()).toEqual([...SYNC_MANAGED_IDENTITY_FIELDS].sort());
+    expect(fields.professionalTitle).toBe("Portfolio Title");
+  });
+
+  it("skips overridden fields even when the portfolio has a value", () => {
+    const fields = identityFieldsForSync(identity, ["professionalTitle"]);
+    expect(fields.professionalTitle).toBeUndefined();
+    expect(fields.fullName).toBe("Portfolio Name");
+  });
+
+  it("never writes fields outside the sync-managed list", () => {
+    const fields = identityFieldsForSync(
+      { ...identity, hourlyRate: 99, languages: ["x"] },
+      []
+    );
+    expect(fields.hourlyRate).toBeUndefined();
+    expect(fields.languages).toBeUndefined();
+  });
+
+  it("tolerates a missing overrides argument", () => {
+    expect(identityFieldsForSync(identity).professionalTitle).toBe("Portfolio Title");
+  });
+});
 
 describe("normalizeSkills", () => {
   it("flattens category-nested skills", () => {

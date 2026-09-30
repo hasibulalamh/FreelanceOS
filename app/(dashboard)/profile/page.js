@@ -9,6 +9,7 @@ import { IdentityEditor } from "@/components/profile/identity-editor";
 import { SkillsManager } from "@/components/profile/skills-manager";
 import { ServicesManager } from "@/components/profile/services-manager";
 import { CertificationsManager } from "@/components/profile/certifications-manager";
+import { OverrideList } from "@/components/profile/override-list";
 
 export const dynamic = "force-dynamic";
 
@@ -97,6 +98,11 @@ export default async function ProfilePage() {
             description="Run a sync to pull your identity, bio and contact data from hasibulalam.com."
           />
         )}
+        {profile?.manualOverrides?.length ? (
+          <div className="px-5 pb-4">
+            <OverrideList overrides={profile.manualOverrides} />
+          </div>
+        ) : null}
       </Card>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

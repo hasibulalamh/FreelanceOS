@@ -121,6 +121,44 @@ export function normalizeIdentity(hero, about, contact) {
 }
 
 /**
+ * Identity columns that portfolio sync writes. Any field in this list can be
+ * manually overridden (Profile.manualOverrides); everything else the identity
+ * form edits (hourlyRate, currency, languages, websiteUrl) is never touched
+ * by sync and therefore never needs an override.
+ */
+export const SYNC_MANAGED_IDENTITY_FIELDS = Object.freeze([
+  "fullName",
+  "professionalTitle",
+  "bio",
+  "summary",
+  "location",
+  "portfolioUrl",
+  "avatarUrl",
+]);
+
+/**
+ * Maps the normalized identity onto the Profile columns the sync may write,
+ * skipping fields the user has manually overridden.
+ *
+ * @param {object} identity normalized identity (see normalizeIdentity)
+ * @param {string[]} manualOverrides field names synced should leave alone
+ * @returns {object} Prisma update payload (undefined = leave untouched)
+ */
+export function identityFieldsForSync(identity, manualOverrides = []) {
+  const overridden = new Set(manualOverrides);
+  const fields = {};
+  for (const key of SYNC_MANAGED_IDENTITY_FIELDS) {
+    // undefined means "leave untouched"; null is a legitimate new value when
+    // the portfolio removed a field. Overridden fields are skipped entirely —
+    // even a null from the portfolio must not clobber the user's edit.
+    if (!overridden.has(key) && identity[key] !== undefined) {
+      fields[key] = identity[key];
+    }
+  }
+  return fields;
+}
+
+/**
  * Computes a stable content hash used to detect portfolio changes without
  * re-running the whole write pipeline. SHA-256 via Web Crypto (available in
  * Node 18+ and Edge runtimes alike).
