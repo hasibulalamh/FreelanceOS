@@ -4,15 +4,13 @@ import { Construction, ArrowLeft } from "lucide-react";
 import { Card, Badge } from "@/components/ui";
 
 // Catch-all for dashboard routes whose modules are not implemented yet.
-// Static pages below take precedence; this renders an honest "planned module"
-// state instead of a 404 as the build progresses phase by phase.
+// Implemented routes (dashboard, profile, platforms, ...) take precedence;
+// this renders an honest "planned module" state for the rest.
 // Must stay dynamic: the (dashboard) layout performs a per-request session
 // check, and a static render would bake the unauthenticated redirect in.
 export const dynamic = "force-dynamic";
 
 const MODULE_PHASES = {
-  profile: { phase: "Phase 6", title: "My Profile", note: "Profile management and portfolio sync." },
-  platforms: { phase: "Phase 7", title: "Platforms", note: "Platform adapters and capability matrix." },
   jobs: { phase: "Phase 11", title: "Jobs", note: "Imported jobs and the job analyzer." },
   "ai-studio": { phase: "Phase 8+", title: "AI Studio", note: "Gemini-powered generation workspace." },
   gigs: { phase: "Phase 15", title: "Gigs", note: "Gig builder and version history." },
