@@ -1,6 +1,13 @@
 // FreelanceOS Prisma schema — Prisma 6 line (stable, classic workflow).
-// The client is generated into node_modules/.prisma by the prisma-client-js
+// The client is generated into node_modules by the prisma-client-js
 // generator and imported from "@prisma/client".
+//
+// Schema scope grows with each phase; this initial version covers:
+//   - auth (User, Session, OAuth Account, VerificationToken)
+//   - profile/portfolio domain synced from the portfolio API
+//   - platform catalog with the capability/permission model
+// Jobs, gigs, proposals, CRM, keywords, research and AI-usage models are
+// added in their own phases.
 
 generator client {
   provider = "prisma-client-js"
@@ -9,4 +16,383 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  // Null for OAuth-only accounts. Bcrypt hash, never the password itself.
+  passwordHash  String?
+  role          UserRole  @default(OWNER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts         Account[]
+  sessions         Session[]
+  profile          Profile?
+  platformAccounts PlatformAccount[]
+  activityLogs     ActivityLog[]
+
+  @@map("users")
+}
+
+// OAuth provider links (Google, GitHub). Shape is Auth.js-compatible so the
+// adapter can be swapped without a data migration.
+model Account {
+  id                   String    @id @default(cuid())
+  userId               String
+  provider             String
+  providerAccountId    String
+  providerRefreshToken String?
+  providerAccessToken  String?
+  expiresAt            DateTime?
+  tokenType            String?
+  scope                String?
+  idToken              String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+}
+
+// ---------------------------------------------------------------------------
+// Profile & portfolio (source of truth: hasibulalam.com portfolio API)
+// ---------------------------------------------------------------------------
+
+// One profile per user. Synced fields are normalized by the portfolio sync
+// service and remain manually editable afterwards.
+model Profile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  fullName          String?
+  professionalTitle String?
+  bio               String?
+  summary           String?
+  location          String?
+  websiteUrl        String?
+  portfolioUrl      String?
+  avatarUrl         String?
+  hourlyRate        Int?
+  currency          String   @default("USD")
+  languages         String[]
+
+  syncStatus   SyncStatus @default(NEVER_SYNCED)
+  lastSyncedAt DateTime?
+  // Content hash of the last portfolio payload, used to detect changes
+  // without re-running the whole normalization pipeline.
+  lastSyncHash String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skills         Skill[]
+  services       Service[]
+  experiences    Experience[]
+  education      Education[]
+  certifications Certification[]
+  projects       Project[]
+  testimonials   Testimonial[]
+
+  @@map("profiles")
+}
+
+// Where a piece of profile data came from. Portfolio-sourced data is refreshed
+// by sync; manual additions are preserved across syncs.
+enum ProfileSource {
+  PORTFOLIO
+  MANUAL
+}
+
+enum SyncStatus {
+  NEVER_SYNCED
+  PENDING
+  SYNCING
+  SYNCED
+  FAILED
+}
+
+model Skill {
+  id        String        @id @default(cuid())
+  profileId String
+  name      String
+  category  String?
+  // 1-5 self-assessed proficiency; optional because the portfolio may not
+  // provide it.
+  level     Int?
+  source    ProfileSource @default(PORTFOLIO)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, name])
+  @@index([name])
+  @@map("skills")
+}
+
+model Service {
+  id          String        @id @default(cuid())
+  profileId   String
+  title       String
+  description String?
+  category    String?
+  source      ProfileSource @default(PORTFOLIO)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@map("services")
+}
+
+model Experience {
+  id          String        @id @default(cuid())
+  profileId   String
+  company     String
+  title       String
+  description String?
+  location    String?
+  startDate   DateTime?
+  endDate     DateTime?
+  isCurrent   Boolean       @default(false)
+  source      ProfileSource @default(PORTFOLIO)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@map("experiences")
+}
+
+model Education {
+  id          String        @id @default(cuid())
+  profileId   String
+  institution String
+  degree      String
+  field       String?
+  startDate   DateTime?
+  endDate     DateTime?
+  description String?
+  source      ProfileSource @default(PORTFOLIO)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@map("education")
+}
+
+model Certification {
+  id            String        @id @default(cuid())
+  profileId     String
+  name          String
+  issuer        String
+  issueDate     DateTime?
+  expiryDate    DateTime?
+  credentialUrl String?
+  source        ProfileSource @default(PORTFOLIO)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@map("certifications")
+}
+
+model Project {
+  id              String        @id @default(cuid())
+  profileId       String
+  title           String
+  slug            String?
+  description     String?
+  longDescription String?
+  // Denormalized technology list — queried far more often than updated, and
+  // a separate table would be over-normalization for this use case.
+  technologies    String[]
+  liveUrl         String?
+  repoUrl         String?
+  imageUrl        String?
+  featured        Boolean       @default(false)
+  completedAt     DateTime?
+  source          ProfileSource @default(PORTFOLIO)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@index([featured])
+  @@map("projects")
+}
+
+model Testimonial {
+  id            String        @id @default(cuid())
+  profileId     String
+  authorName    String
+  authorRole    String?
+  authorCompany String?
+  quote         String
+  rating        Int?
+  source        ProfileSource @default(PORTFOLIO)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@map("testimonials")
+}
+
+// ---------------------------------------------------------------------------
+// Platforms & capability model
+// ---------------------------------------------------------------------------
+
+// Catalog of supported marketplaces. Static capability truth lives here so
+// the UI can honestly state what each platform supports — no guessed APIs.
+model Platform {
+  id         String  @id @default(cuid())
+  slug       String  @unique
+  name       String
+  // Marketplace URL, used for deep links and browser-assistance matching.
+  websiteUrl String?
+  isActive   Boolean @default(true)
+
+  capabilities     PlatformCapability[]
+  platformAccounts PlatformAccount[]
+
+  @@map("platforms")
+}
+
+// One row per (platform, capability). The UI must derive every platform
+// claim from these rows instead of hardcoding assumptions.
+model PlatformCapability {
+  id         String                   @id @default(cuid())
+  platformId String
+  capability PlatformCapabilityType
+  status     PlatformCapabilityStatus
+  // Human-readable explanation of WHY a capability has this status
+  // (e.g. "Fiverr provides no public API for gig creation").
+  notes      String?
+
+  platform Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([platformId, capability])
+  @@map("platform_capabilities")
+}
+
+enum PlatformCapabilityType {
+  PROFILE_SYNC
+  JOB_IMPORT
+  GIG_MANAGEMENT
+  PROPOSAL_MANAGEMENT
+  KEYWORD_RESEARCH
+  BROWSER_ASSISTANCE
+  OFFICIAL_API
+  OAUTH
+  AUTOMATIC_SUBMISSION
+}
+
+enum PlatformCapabilityStatus {
+  SUPPORTED
+  NOT_SUPPORTED
+  USER_AUTH_REQUIRED
+  PLATFORM_APPROVAL_REQUIRED
+  MANUAL_ONLY
+}
+
+// A user's account on a marketplace. Credentials are intentionally absent:
+// FreelanceOS never stores marketplace passwords or browser cookies. When an
+// official OAuth integration is added (later phase), encrypted token columns
+// will be introduced by migration.
+model PlatformAccount {
+  id               String                @id @default(cuid())
+  userId           String
+  platformId       String
+  status           PlatformAccountStatus @default(NOT_CONNECTED)
+  externalUsername String?
+  lastSyncedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform Platform         @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  profile  PlatformProfile?
+
+  @@unique([userId, platformId])
+  @@map("platform_accounts")
+}
+
+enum PlatformAccountStatus {
+  NOT_CONNECTED
+  CONNECTED
+  AUTH_REQUIRED
+  ERROR
+}
+
+// Mirror of the user's profile on a marketplace, used to track optimization
+// state independently from the local master profile.
+model PlatformProfile {
+  id                 String             @id @default(cuid())
+  platformAccountId  String             @unique
+  title              String?
+  overview           String?
+  optimizationStatus OptimizationStatus @default(NOT_OPTIMIZED)
+  lastOptimizedAt    DateTime?
+
+  platformAccount PlatformAccount @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+
+  @@map("platform_profiles")
+}
+
+enum OptimizationStatus {
+  NOT_OPTIMIZED
+  IN_PROGRESS
+  OPTIMIZED
+  NEEDS_REVIEW
+}
+
+// ---------------------------------------------------------------------------
+// Activity log (audit trail; the dashboard "Recent Activity" feed)
+// ---------------------------------------------------------------------------
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  // Feature area that produced the event (auth, portfolio, platforms, ...).
+  context   String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("activity_logs")
 }
