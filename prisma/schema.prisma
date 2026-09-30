@@ -1,0 +1,12 @@
+// FreelanceOS Prisma schema — Prisma 6 line (stable, classic workflow).
+// The client is generated into node_modules/.prisma by the prisma-client-js
+// generator and imported from "@prisma/client".
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

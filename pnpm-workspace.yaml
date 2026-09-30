@@ -1,6 +1,14 @@
 allowBuilds:
+  # Prisma client postinstall generates the client stub.
+  '@prisma/client': true
+  # Prisma engine binaries download + CLI postinstall.
+  '@prisma/engines': true
+  prisma: true
+  # Prisma 7+ CLI loads prisma.config.* through esbuild.
   sharp: false
   unrs-resolver: false
+  # Cloudflare Workers runtime — not used by this project.
+  workerd: false
 minimumReleaseAgeExclude:
   - '@next/env@16.3.8'
   - '@next/eslint-plugin-next@16.3.8'
