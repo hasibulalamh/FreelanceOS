@@ -64,6 +64,7 @@ export default async function DashboardPage() {
       },
       platformAccounts: { include: { platform: true } },
       activityLogs: { orderBy: { createdAt: "desc" }, take: 8 },
+      _count: { select: { aiGenerations: true } },
     },
   });
 
@@ -159,8 +160,12 @@ export default async function DashboardPage() {
         <StatCard
           icon={Sparkles}
           label="AI generations"
-          value="0"
-          hint="AI Studio arrives in a later phase"
+          value={user._count.aiGenerations}
+          hint={
+            user._count.aiGenerations === 0
+              ? "Run your first generation in AI Studio"
+              : "Audited runs with model + prompt version"
+          }
         />
       </section>
 
