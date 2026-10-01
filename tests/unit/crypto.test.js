@@ -16,7 +16,7 @@ describe("token encryption", () => {
   // env var here is sufficient for every test below.
 
   it("roundtrips a token", () => {
-    const token = "fln-oauth-token-abc123";
+    const token = "fln-oauth-token-abc123"; // freelanceos-ignore-secret (test fixture)
     const envelope = encryptSecret(token);
     expect(envelope).not.toContain(token);
     expect(envelope.startsWith("v1:")).toBe(true);

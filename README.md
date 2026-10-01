@@ -60,6 +60,7 @@ created becomes the platform OWNER; further registrations are rejected.
 | `pnpm build` / `pnpm start` | production build / serve         |
 | `pnpm lint`                 | ESLint (next/core-web-vitals +)  |
 | `pnpm test`                 | vitest unit tests                |
+| `pnpm scan:secrets`         | full-tree secret scan (CI-style) |
 | `pnpm exec prisma migrate dev` | apply schema changes          |
 | `pnpm exec prisma db seed`  | seed platform catalog            |
 
@@ -155,6 +156,12 @@ See `docs/` for module-level documentation.
 ## Security notes
 
 - Marketplace passwords/cookies are **never** stored; no credential fields exist.
+- **Secret scanning is enforced at commit time**: a pre-commit hook
+  (`githooks/pre-commit`, wired via `pnpm prepare` → `core.hooksPath`) runs
+  `scripts/scan-secrets.mjs` over staged files and blocks the commit on any
+  known secret shape (private keys, secret-env assignments, high-entropy
+  assignments, credential-bearing URLs, provider tokens). Scan the whole
+  tree anytime with `pnpm scan:secrets`.
 - Third-party OAuth tokens are stored **encrypted at rest** (AES-256-GCM) or
   not at all.
 - No scraping, CAPTCHA/anti-bot bypass, or mass actions — by design and by test.

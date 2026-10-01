@@ -1,0 +1,10 @@
+#!/bin/sh
+# Pre-commit gate: block commits that introduce potential secrets.
+# Bypass (rarely, deliberately): git commit --no-verify
+echo "pre-commit: scanning staged files for secrets…"
+node scripts/scan-secrets.mjs || {
+  echo ""
+  echo "pre-commit: COMMIT BLOCKED — see findings above."
+  echo "Move the secret into .env (gitignored) before committing."
+  exit 1
+}
