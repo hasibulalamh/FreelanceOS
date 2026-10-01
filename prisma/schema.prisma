@@ -39,6 +39,7 @@ model User {
   profile          Profile?
   platformAccounts PlatformAccount[]
   activityLogs     ActivityLog[]
+  aiGenerations    AiGeneration[]
 
   @@map("users")
 }// OAuth provider links (Google, GitHub). Field names intentionally match
@@ -411,4 +412,46 @@ model ActivityLog {
 
   @@index([userId, createdAt])
   @@map("activity_logs")
+}
+
+// ---------------------------------------------------------------------------
+// AI generations (Phase 8)
+// ---------------------------------------------------------------------------
+
+// Audit trail of every AI generation. AI proposes, the app validates and
+// writes: generated content is stored here as a draft, never auto-applied to
+// profile/platform data. Inputs and outputs are plain JSON so any generation
+// can be inspected, re-run, or diffed later.
+model AiGeneration {
+  id            String          @id @default(cuid())
+  userId        String
+  // Which AI module produced this ("KEYWORD_RESEARCH", later others).
+  kind          String
+  status        AiGenerationStatus @default(COMPLETED)
+  // Exact model id (e.g. gemini-2.5-flash) and prompt version used, so old
+  // generations remain interpretable after prompts evolve.
+  model         String
+  promptVersion Int
+  // Zod-validated input and output of the generation.
+  input         Json
+  output        Json
+  error         String?
+  // Real usage numbers reported by the API — never estimated.
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+  latencyMs     Int?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, kind])
+  @@map("ai_generations")
+}
+
+enum AiGenerationStatus {
+  COMPLETED
+  FAILED
 }
