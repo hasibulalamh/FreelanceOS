@@ -27,7 +27,8 @@ a marketplace officially permits (see `services/platforms/catalog.js`).
 | ORM       | Prisma 6 (stable line; v7/8 evaluated, deferred)   |
 | Auth      | NextAuth v4 — credentials + Google/GitHub OAuth    |
 | Tests     | Vitest                                             |
-| Planned   | Redis + BullMQ, Gemini API, Cloudflare R2, MV3 ext |
+| AI        | Gemini API (REST `generateContent`, structured output) |
+| Planned   | Redis + BullMQ, Cloudflare R2, MV3 extension       |
 
 ## Quickstart
 
@@ -40,8 +41,9 @@ docker run -d --name freelanceos-pg \
   -e POSTGRES_DB=freelanceos -p 5433:5432 postgres:16-alpine
 
 cp .env.example .env          # then fill DATABASE_URL + AUTH_SECRET
-# optional but recommended: CREDENTIAL_ENCRYPTION_KEY (openssl rand -hex 32)
-# to encrypt marketplace OAuth tokens at rest
+# optional: CREDENTIAL_ENCRYPTION_KEY (openssl rand -hex 32) encrypts
+# marketplace OAuth tokens at rest
+# optional: GEMINI_API_KEY (aistudio.google.com/apikey) enables AI Studio
 pnpm exec prisma migrate dev  # apply schema
 pnpm exec prisma db seed      # platform capability catalog
 pnpm dev                      # http://localhost:3000
@@ -75,11 +77,13 @@ app/
     auth/register/      owner registration (single-account policy)
     portfolio/sync/     triggers portfolio synchronization
     platforms/          platform catalog + user account status
+    ai/                 AI modules (keyword research; more per phase)
 components/             shared UI (client islands + server-safe primitives)
-lib/                    prisma client, auth options, config, api envelope
+lib/                    prisma client, auth options, config, crypto, api envelope
 services/
   portfolio/            portfolio sync: client → normalize → sync-service
-  platforms/            capability catalog (source of truth for the UI)
+  platforms/            capability catalog + registry + adapters
+  ai/                   Gemini client, versioned prompts, generation service
 prisma/                 schema, migrations, seed
 validators/             zod schemas
 tests/                  vitest unit tests + portfolio API mock
@@ -118,6 +122,15 @@ the `projects/0.1/projects` search endpoint, with tokens **encrypted at rest**
 fetch and job search are live under `/api/platforms/freelancer/*`; job results
 are returned, not yet persisted. See `docs/platforms.md`.
 
+### AI engine (Gemini)
+`services/ai/` wraps the Gemini REST API (`generateContent`) with a
+zero-dependency client and zod-validated structured output
+(`responseJsonSchema`). Prompts are **versioned** and every run — success or
+failure — is stored as an audited `AiGeneration` row with model, prompt
+version, and real token usage. The first module, **keyword research**,
+analyzes only the user's own profile and is forbidden from inventing
+metrics (no search volumes, no competition scores). See `docs/ai-engine.md`.
+
 ### Honest data rule
 The dashboard, analytics and profile pages only render numbers that exist in
 the database. Empty states carry CTAs; missing features are labeled with the
@@ -132,8 +145,9 @@ phase that delivers them.
 - [x] Phase 5 — Portfolio sync
 - [x] Phase 6 — Profile management (identity editing, manual skills/services/certifications)
 - [x] Phase 7 — Platform adapters (Freelancer.com official API + OAuth, encrypted tokens)
-- [ ] Phase 8+ — Gemini AI engine, keyword research, profile optimizer,
-      job analyzer, portfolio matcher, proposals, gig builder
+- [x] Phase 8 — AI engine: Gemini client, versioned prompts, keyword research
+- [ ] Phase 9+ — Profile optimizer, job analyzer, portfolio matcher,
+      proposals, gig builder (AI modules on the same engine)
 - [ ] Phase 17+ — Client CRM, analytics, Redis/BullMQ, R2, extension
 
 See `docs/` for module-level documentation.
@@ -144,5 +158,8 @@ See `docs/` for module-level documentation.
 - Third-party OAuth tokens are stored **encrypted at rest** (AES-256-GCM) or
   not at all.
 - No scraping, CAPTCHA/anti-bot bypass, or mass actions — by design and by test.
+- AI output is schema-validated, stored as drafts, and never applied to
+  profile/platform data without an explicit future apply action; AI prompts
+  forbid invented metrics.
 - Secrets live only in env vars; `.env*` is gitignored; API routes authorize
   via session and rate-limit sensitive endpoints.

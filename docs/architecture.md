@@ -9,7 +9,7 @@ to hold the whole system in their head.
 ```
 app/(dashboard)/*     → pages (server components; DB reads direct)
 app/api/*             → route handlers (auth, validation, thin orchestration)
-services/*            → business logic (portfolio sync, platforms, AI later)
+services/*            → business logic (portfolio sync, platforms, AI engine)
 lib/*                 → cross-cutting: prisma client, auth, config, api envelope
 validators/*          → zod schemas shared by API routes
 prisma/               → schema + migrations + seeds
@@ -51,9 +51,12 @@ Route protection: edge middleware redirects cookie-less requests to `/login`
 
 ## Planned layers (not yet built)
 
-- **AI engine** (`services/ai/`): Gemini calls behind a client abstraction,
-  versioned prompts, Zod-validated structured outputs. AI proposes; the app
-  validates and writes. AI never gets DB/marketplace/browser access.
+- **AI engine** (`services/ai/`, phase 8: client + prompt registry + first
+  module shipped): Gemini calls behind a zero-dependency client
+  (`generateStructured`), versioned prompts, Zod-validated structured
+  outputs, audited `AiGeneration` rows. AI proposes; the app validates and
+  writes. AI never gets DB/marketplace/browser access — new modules plug
+  into the existing prompt registry and generation service.
 - **Queues** (Redis + BullMQ): AI generation, research processing, analytics
   aggregation. The in-memory rate limiter is replaced by a Redis limiter then.
 - **Storage**: R2 signed-URL uploads; credentials stay server-side.

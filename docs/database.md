@@ -28,14 +28,21 @@ committed under `prisma/migrations/`. Apply with `pnpm exec prisma migrate dev`.
 - `platforms` — the six supported marketplaces (seeded).
 - `platform_capabilities` — one row per (platform, capability) with
   `status` + `notes`. The UI derives ALL platform claims from these rows.
-- `platform_accounts` — a user's account on a marketplace. **No credential
-  columns by design**; official-OAuth token columns will be added later,
-  encrypted.
+- `platform_accounts` — a user's account on a marketplace. Official-OAuth
+  token columns (phase 7) are stored **encrypted at rest** (AES-256-GCM,
+  `lib/crypto.js`); plaintext never reaches the DB or logs.
 - `platform_profiles` — optimization state of the marketplace-side profile.
 
 ### Auditing
 - `activity_logs` — append-only event feed (auth events, portfolio syncs,
-  future AI generations). Index on `(userId, createdAt)`.
+  AI generations). Index on `(userId, createdAt)`.
+
+### AI (phase 8)
+- `ai_generations` — one row per AI attempt (success **and** failure):
+  `kind`, `status` (COMPLETED/FAILED), exact `model` + `promptVersion`,
+  validated `input`/`output` JSON, `error`, real token usage, and
+  `latencyMs`. Indexes on `(userId, createdAt)` and `(userId, kind)`.
+  See `docs/ai-engine.md`.
 
 ## Conventions
 
