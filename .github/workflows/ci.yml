@@ -1,0 +1,57 @@
+# CI for FreelanceOS.
+#
+# The local pre-commit hook (githooks/pre-commit) only protects clones that
+# ran `pnpm prepare`; CI is the enforcing layer that runs regardless of local
+# git config. Two jobs:
+#
+#   scan-secrets — the same dependency-free scanner as the hook, over the
+#                  whole tracked tree. A leaked secret must not survive a push.
+#   verify       — lint + unit tests + production build, so main stays green
+#                  without relying on anyone's machine.
+#
+# Honest env note: the build never touches the database (all data pages are
+# dynamic), so DATABASE_URL is the documented placeholder from .env.example —
+# no real secrets are ever needed or stored in CI config.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  scan-secrets:
+    name: Secret scan (full tree)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Scan tracked tree for secrets
+        run: node scripts/scan-secrets.mjs --all
+
+  verify:
+    name: Lint, test, build
+    runs-on: ubuntu-latest
+    env:
+      # Placeholder only (see header). Prisma client generation and the Next
+      # build do not connect to any database.
+      DATABASE_URL: "postgresql://user:password@localhost:5433/freelanceos?schema=public"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Enable pnpm (version from packageManager field)
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      - name: Unit tests
+        run: pnpm test
+      - name: Build
+        run: pnpm build

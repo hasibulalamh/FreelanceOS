@@ -10,7 +10,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "scan:secrets": "node scripts/scan-secrets.mjs --all",
-    "prepare": "git config core.hooksPath githooks"
+    "prepare": "git config core.hooksPath githooks || true"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
